@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browser Fingerprint Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #16181f;
+      --surface-2: #1e2029;
+      --border: rgba(255,255,255,0.07);
+      --primary: #4f6ef7;
+      --primary-hover: #6b85ff;
+      --accent: #7c5cfc;
+      --text: #e8eaf2;
+      --text-muted: #7b7f94;
+      --text-dim: #3d4055;
+      --success: #34d399;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --shadow-lg: 0 16px 48px rgba(0,0,0,0.6);
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 20px 100px;
+      line-height: 1.6;
+    }
+
+    /* ── Background subtle grid ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(79,110,247,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79,110,247,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Radial glow ── */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(ellipse at center, rgba(79,110,247,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* ── Header ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(79,110,247,0.1);
+      border: 1px solid rgba(79,110,247,0.25);
+      border-radius: 100px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--primary);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 8px var(--primary);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 40px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #e8eaf2 0%, #7b7f94 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+
+    .hero p {
+      font-size: 15px;
+      color: var(--text-muted);
+      max-width: 480px;
+      margin: 0 auto;
+      font-weight: 400;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.3s ease, transform 0.3s ease;
+      margin-bottom: 20px;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.4s;
+    }
+
+    .status-dot.active {
+      background: var(--success);
+      box-shadow: 0 0 10px rgba(52,211,153,0.5);
+    }
+
+    /* ── Generate Button ── */
+    .btn-generate {
+      width: 100%;
+      padding: 14px 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(79,110,247,0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-generate::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn-generate:hover::before { opacity: 1; }
+
+    .btn-generate:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(79,110,247,0.5);
+    }
+
+    .btn-generate:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 12px rgba(79,110,247,0.3);
+    }
+
+    .btn-generate.loading {
+      opacity: 0.7;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ── Results Grid ── */
+    .results {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .results.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .result-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .result-item:hover {
+      border-color: rgba(79,110,247,0.3);
+      background: rgba(79,110,247,0.04);
+    }
+
+    .result-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .result-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      word-break: break-all;
+      line-height: 1.5;
+    }
+
+    .result-value.mono {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      color: var(--primary);
+    }
+
+    .result-item.full-width {
+      grid-column: 1 / -1;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 28px 0;
+    }
+
+    /* ── Canvas Section ── */
+    .canvas-section {
+      margin-top: 0;
+    }
+
+    .canvas-preview-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 20px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s;
+    }
+
+    .canvas-preview-wrap.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .canvas-frame {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    #fingerprintCanvas {
+      border-radius: 8px;
+      max-width: 100%;
+    }
+
+    .hash-block {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+    }
+
+    .hash-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .hash-value {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      word-break: break-all;
+      line-height: 1.7;
+    }
+
+    /* ── Skeleton loader ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface-2) 25%, rgba(79,110,247,0.05) 50%, var(--surface-2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+      height: 14px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      margin-top: 48px;
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer a:hover { color: var(--text); }
+
+    /* ── Responsive ── */
+    @media (max-width: 500px) {
+      .results { grid-template-columns: 1fr; }
+      .card { padding: 24px 20px; }
+      body { padding: 40px 16px 80px; }
+    }
+
+    /* ── Copy toast ── */
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 100;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Copy button ── */
+    .btn-copy {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-copy:hover {
+      border-color: rgba(79,110,247,0.4);
+      color: var(--primary);
+      background: rgba(79,110,247,0.06);
+    }
+
+    .hash-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-badge">Privacy &amp; Tracking</div>
+    <h1>Browser Fingerprint Analyzer</h1>
+    <p>Discover the unique characteristics your browser silently exposes — no cookies, no login required.</p>
+  </header>
+
+  <!-- Main Fingerprint Card -->
+  <div class="card" id="mainCard">
+    <div class="card-header">
+      <span class="card-title">Device Characteristics</span>
+      <span class="status-dot" id="statusDot"></span>
+    </div>
+
+    <button class="btn-generate" id="generateBtn" onclick="generateFingerprint()">
+      Generate My Fingerprint
+    </button>
+
+    <div class="results" id="results"></div>
+  </div>
+
+  <!-- Canvas Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Canvas Fingerprint</span>
+    </div>
+
+    <p style="font-size:13px;color:var(--text-muted);line-height:1.7;">
+      Canvas fingerprinting renders hidden text and shapes using your GPU and browser engine.
+      The pixel-level output is hashed into a unique identifier tied to your device.
+    </p>
+
+    <div class="canvas-preview-wrap" id="canvasWrap">
+      <div class="canvas-frame">
+        <canvas id="fingerprintCanvas" width="480" height="80"></canvas>
+        <span style="font-size:11px;color:var(--text-muted);letter-spacing:0.04em;">Rendered canvas output</span>
+      </div>
+      <div class="hash-block">
+        <div class="hash-header">
+          <div class="hash-label">Canvas Hash</div>
+          <button class="btn-copy" onclick="copyHash()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
+        </div>
+        <div class="hash-value" id="canvasHash">Run the analyzer above to generate a canvas hash.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">Copied to clipboard</div>
+
+<script>
+  let generatedHash = '';
+
+  // ── Simple non-crypto hash (djb2-style) ──
+  function simpleHash(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+      hash = hash >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+
+  // ── Canvas fingerprint ──
+  function getCanvasFingerprint() {
+    const canvas = document.getElementById('fingerprintCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    ctx.fillStyle = '#16181f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Text rendering (GPU-dependent)
+    ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, '#4f6ef7');
+    gradient.addColorStop(1, '#7c5cfc');
+    ctx.fillStyle = gradient;
+    ctx.fillText('BrowserFingerprint\u2022Analyzer\u00A9', 20, 34);
+
+    ctx.font = '11px SF Mono, Fira Code, monospace';
+    ctx.fillStyle = 'rgba(123,127,148,0.8)';
+    ctx.fillText(navigator.userAgent.substring(0, 80), 20, 56);
+
+    // Shapes
+    ctx.beginPath();
+    ctx.arc(canvas.width - 40, 40, 18, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(79,110,247,0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(canvas.width - 55, 40);
+    ctx.lineTo(canvas.width - 25, 40);
+    ctx.strokeStyle = 'rgba(124,92,252,0.5)';
+    ctx.stroke();
+
+    const dataURL = canvas.toDataURL();
+    return simpleHash(dataURL);
+  }
+
+  // ── Collect fingerprint data ──
+  function collectFingerprint() {
+    const nav = navigator;
+    const scr = screen;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    return {
+      'User Agent':        nav.userAgent,
+      'Language':          nav.language || nav.userLanguage || 'N/A',
+      'Platform':          nav.platform || 'N/A',
+      'CPU Cores':         nav.hardwareConcurrency ? nav.hardwareConcurrency + ' logical cores' : 'N/A',
+      'Device Memory':     nav.deviceMemory ? nav.deviceMemory + ' GB' : 'N/A',
+      'Screen Resolution': scr.width + ' × ' + scr.height + ' @ ' + scr.colorDepth + '-bit',
+      'Timezone':          tz,
+      'Touch Points':      nav.maxTouchPoints > 0 ? nav.maxTouchPoints + ' touch points' : 'None',
+    };
+  }
+
+  // ── Render results ──
+  function renderResults(data) {
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+
+    const entries = Object.entries(data);
+    entries.forEach(([label, value], i) => {
+      const item = document.createElement('div');
+      item.className = 'result-item' + (label === 'User Agent' ? ' full-width' : '');
+      item.style.opacity = '0';
+      item.style.transform = 'translateY(8px)';
+      item.style.transition = `opacity 0.35s ease ${i * 60}ms, transform 0.35s ease ${i * 60}ms`;
+
+      const isMono = label === 'User Agent';
+      item.innerHTML = `
+        <div class="result-label">${label}</div>
+        <div class="result-value ${isMono ? 'mono' : ''}">${value}</div>
+      `;
+      container.appendChild(item);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          item.style.opacity = '1';
+          item.style.transform = 'translateY(0)';
+        });
+      });
+    });
+
+    container.classList.add('visible');
+  }
+
+  // ── Main generate function ──
+  function generateFingerprint() {
+    const btn = document.getElementById('generateBtn');
+    const dot = document.getElementById('statusDot');
+
+    btn.classList.add('loading');
+    btn.textContent = 'Analyzing...';
+
+    setTimeout(() => {
+      const data = collectFingerprint();
+      console.group('%c🔍 Browser Fingerprint', 'color:#4f6ef7;font-weight:700;font-size:14px;');
+      Object.entries(data).forEach(([k, v]) => console.log(`%c${k}:%c ${v}`, 'color:#7b7f94;font-weight:600;', 'color:#e8eaf2;'));
+      console.groupEnd();
+
+      renderResults(data);
+
+      // Canvas
+      const hash = getCanvasFingerprint();
+      generatedHash = hash;
+
+      // Build a multi-segment hash for display
+      const fullHash = [
+        simpleHash(navigator.userAgent),
+        simpleHash(navigator.language + screen.width + screen.height),
+        hash,
+        simpleHash(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      ].join('-');
+
+      document.getElementById('canvasHash').textContent = fullHash;
+      document.getElementById('canvasWrap').classList.add('visible');
+
+      console.log('%c🎨 Canvas Hash:', 'color:#7c5cfc;font-weight:700;', fullHash);
+
+      dot.classList.add('active');
+      btn.classList.remove('loading');
+      btn.textContent = 'Regenerate Fingerprint';
+    }, 600);
+  }
+
+  // ── Copy hash ──
+  function copyHash() {
+    const text = document.getElementById('canvasHash').textContent;
+    if (!text || text.startsWith('Run')) return;
+    navigator.clipboard.writeText(text).then(() => showToast('Hash copied!'));
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+</script>
+
+</body>
+</html>
